@@ -9,14 +9,14 @@ import storage from './storage';
 type GuildId = string;
 
 class GuildPlayback {
-  connection: VoiceConnection | null = null;
+  connection: any = null;
   // current active player
-  currentPlayer: AudioPlayer | null = null;
+  currentPlayer: any = null;
   // previous player (used during crossfade)
-  previousPlayer: AudioPlayer | null = null;
+  previousPlayer: any = null;
   // resources for players so we can adjust volumes
-  currentResource: AudioResource | null = null;
-  previousResource: AudioResource | null = null;
+  currentResource: any = null;
+  previousResource: any = null;
   volume = 1.0; // 0.0 - 2.0
   queue: string[] = [];
   crossfadeSeconds = 1.5;
@@ -50,7 +50,7 @@ export class AudioManager {
   }
 
   // Connect to a voice channel and prepare players
-  connectTo(channel: VoiceChannel) {
+  connectTo(channel: any) {
     const guildId = channel.guild.id;
     const gp = this.ensureGuild(guildId);
     if (!gp.connection) {
@@ -212,7 +212,7 @@ export class AudioManager {
   }
 
   // Add a URL to the queue and ensure playback
-  async play(channel: VoiceChannel, url: string) {
+  async play(channel: any, url: string) {
     const guildId = channel.guild.id;
     const gp = this.connectTo(channel);
     gp.queue.push(url);

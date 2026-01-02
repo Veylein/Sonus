@@ -1,4 +1,5 @@
-import { SlashCommandBuilder, PermissionsBitField, ChatInputCommandInteraction, SlashCommandSubcommandBuilder, SlashCommandStringOption } from 'discord.js';
+import { SlashCommandBuilder, PermissionsBitField } from 'discord.js';
+import type { ChatInputCommandInteraction, SlashCommandSubcommandBuilder, SlashCommandStringOption } from 'discord.js';
 import audioManager from '../services/audioManager';
 
 export default {
