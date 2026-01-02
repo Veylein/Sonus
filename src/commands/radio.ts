@@ -1,19 +1,19 @@
-import { SlashCommandBuilder, PermissionsBitField } from 'discord.js';
+import { SlashCommandBuilder, PermissionsBitField, ChatInputCommandInteraction, SlashCommandSubcommandBuilder, SlashCommandStringOption } from 'discord.js';
 import audioManager from '../services/audioManager';
 
 export default {
   data: new SlashCommandBuilder()
     .setName('radio')
     .setDescription('Manage radios for this server')
-    .addSubcommand(sub => sub.setName('create').setDescription('Create a radio').addStringOption(o => o.setName('name').setDescription('Radio name').setRequired(true)).addStringOption(o => o.setName('description').setDescription('Description').setRequired(false)).addStringOption(o => o.setName('url').setDescription('Optional stream/seed URL').setRequired(false)))
-    .addSubcommand(sub => sub.setName('delete').setDescription('Delete a radio').addStringOption(o => o.setName('name').setDescription('Radio name').setRequired(true)))
-    .addSubcommand(sub => sub.setName('list').setDescription('List radios'))
-    .addSubcommand(sub => sub.setName('enable').setDescription('Enable a radio').addStringOption(o => o.setName('name').setDescription('Radio name').setRequired(true)))
-    .addSubcommand(sub => sub.setName('disable').setDescription('Disable a radio').addStringOption(o => o.setName('name').setDescription('Radio name').setRequired(true)))
-    .addSubcommand(sub => sub.setName('setdefault').setDescription('Set default radio for server').addStringOption(o => o.setName('name').setDescription('Radio name').setRequired(true)))
-    .addSubcommand(sub => sub.setName('view').setDescription('View radio details').addStringOption(o => o.setName('name').setDescription('Radio name').setRequired(false))),
+    .addSubcommand((sub: SlashCommandSubcommandBuilder) => sub.setName('create').setDescription('Create a radio').addStringOption((o: SlashCommandStringOption) => o.setName('name').setDescription('Radio name').setRequired(true)).addStringOption((o: SlashCommandStringOption) => o.setName('description').setDescription('Description').setRequired(false)).addStringOption((o: SlashCommandStringOption) => o.setName('url').setDescription('Optional stream/seed URL').setRequired(false)))
+    .addSubcommand((sub: SlashCommandSubcommandBuilder) => sub.setName('delete').setDescription('Delete a radio').addStringOption((o: SlashCommandStringOption) => o.setName('name').setDescription('Radio name').setRequired(true)))
+    .addSubcommand((sub: SlashCommandSubcommandBuilder) => sub.setName('list').setDescription('List radios'))
+    .addSubcommand((sub: SlashCommandSubcommandBuilder) => sub.setName('enable').setDescription('Enable a radio').addStringOption((o: SlashCommandStringOption) => o.setName('name').setDescription('Radio name').setRequired(true)))
+    .addSubcommand((sub: SlashCommandSubcommandBuilder) => sub.setName('disable').setDescription('Disable a radio').addStringOption((o: SlashCommandStringOption) => o.setName('name').setDescription('Radio name').setRequired(true)))
+    .addSubcommand((sub: SlashCommandSubcommandBuilder) => sub.setName('setdefault').setDescription('Set default radio for server').addStringOption((o: SlashCommandStringOption) => o.setName('name').setDescription('Radio name').setRequired(true)))
+    .addSubcommand((sub: SlashCommandSubcommandBuilder) => sub.setName('view').setDescription('View radio details').addStringOption((o: SlashCommandStringOption) => o.setName('name').setDescription('Radio name').setRequired(false))),
 
-  async execute(interaction: any) {
+  async execute(interaction: ChatInputCommandInteraction) {
     const guildId = interaction.guildId;
     if (!guildId) {
       await interaction.reply({ content: 'This command must be used in a guild.', ephemeral: true });

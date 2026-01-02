@@ -7,7 +7,7 @@
     "build": "tsc",
     "start": "node dist/index.js",
     "dev": "ts-node src/index.ts",
-    "register-commands": "ts-node scripts/register-commands.ts"
+    "register-commands": "ts-node src/scripts/register-commands.ts"
   },
   "engines": {
     "node": ">=18"
