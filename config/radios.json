@@ -1,0 +1,12 @@
+{
+  "defaultRadios": {
+    "Lo-Fi Ritual": {
+      "description": "Chill lo-fi beats for focus.",
+      "url": "https://www.youtube.com/watch?v=5qap5aO4i9A"
+    },
+    "Midnight Code": {
+      "description": "Dark synths and late-night coding.",
+      "url": "https://www.youtube.com/watch?v=DWcJFNfaw9c"
+    }
+  }
+}
