@@ -12,7 +12,7 @@ try {
 }
 
 import { Client, GatewayIntentBits, SlashCommandBuilder } from 'discord.js';
-import { joinVoiceChannel, createAudioPlayer, createAudioResource, AudioPlayerStatus, getVoiceConnection } from '@discordjs/voice';
+import { joinVoiceChannel, createAudioPlayer, createAudioResource, AudioPlayerStatus, getVoiceConnection, StreamType } from '@discordjs/voice';
 import ytdl from 'ytdl-core';
 
 const token = process.env.DISCORD_TOKEN;
@@ -44,7 +44,10 @@ async function playSong(guildId: string) {
 
   const song = serverQueue.songs[0];
   const stream = ytdl(song, { filter: 'audioonly', highWaterMark: 1 << 25, quality: 'highestaudio' });
-  const resource = createAudioResource(stream);
+  stream.on('error', (err) => {
+    console.error(`ytdl stream error for guild ${guildId}:`, err);
+  });
+  const resource = createAudioResource(stream, { inputType: StreamType.Arbitrary });
 
   serverQueue.player.play(resource);
   serverQueue.player.once(AudioPlayerStatus.Idle, () => {
@@ -65,17 +68,23 @@ client.on('messageCreate', async (message: any) => {
 
   let serverQueue = queue.get(message.guild.id);
   if (!serverQueue) {
+    const player = createAudioPlayer();
+    player.on('error', (error) => {
+      console.error(`Audio player error (message) guild=${message.guild?.id}:`, error);
+    });
+
     serverQueue = {
       songs: [],
-      player: createAudioPlayer(),
+      player,
     };
     queue.set(message.guild.id, serverQueue);
 
-    joinVoiceChannel({
+    const connection = joinVoiceChannel({
       channelId: voiceChannel.id,
       guildId: message.guild.id,
       adapterCreator: message.guild.voiceAdapterCreator,
     });
+    connection.subscribe(player);
   }
 
   switch (command) {
@@ -149,14 +158,20 @@ client.on('interactionCreate', async (interaction: any) => {
 
   let serverQueue = queue.get(interaction.guild.id);
   if (!serverQueue) {
-    serverQueue = { songs: [], player: createAudioPlayer() };
+    const player = createAudioPlayer();
+    player.on('error', (error) => {
+      console.error(`Audio player error (interaction) guild=${interaction.guild?.id}:`, error);
+    });
+
+    serverQueue = { songs: [], player };
     queue.set(interaction.guild.id, serverQueue);
 
-    joinVoiceChannel({
+    const connection = joinVoiceChannel({
       channelId: voiceChannel.id,
       guildId: interaction.guild.id,
       adapterCreator: interaction.guild.voiceAdapterCreator,
     });
+    connection.subscribe(player);
   }
 
   switch (command) {
