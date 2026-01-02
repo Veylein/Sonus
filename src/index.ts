@@ -1,4 +1,11 @@
-import 'dotenv/config';
+// load .env when available (optional on deploy hosts)
+try {
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  const _d = require('dotenv');
+  if (_d && typeof _d.config === 'function') _d.config();
+} catch (e) {
+  // ignore if dotenv is not installed in the environment
+}
 import { Client, Collection, GatewayIntentBits, Partials } from 'discord.js';
 import audioManager from './services/audioManager';
 import playlists from './services/playlists';
