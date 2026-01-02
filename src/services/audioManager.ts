@@ -255,9 +255,39 @@ export class AudioManager {
       '-f', 's16le',
       'pipe:1'
     ];
-    const ff = spawn(ffmpegPath || 'ffmpeg', args, { stdio: ['pipe', 'pipe', 'ignore'] });
+    console.log(`Starting playback for ${nextUrl} using ffmpeg at ${ffmpegPath || 'ffmpeg'}`);
+    const ff = spawn(ffmpegPath || 'ffmpeg', args, { stdio: ['pipe', 'pipe', 'pipe'] });
     ytdlStream.pipe(ff.stdin);
-    const resource = createAudioResource(ff.stdout, { inputType: StreamType.Raw, inlineVolume: true });
+
+    // attach error listeners so we can fallback if ffmpeg fails
+    ytdlStream.on('error', (err: any) => {
+      console.error('ytdl stream error for', nextUrl, err);
+    });
+    ff.on('error', (err: any) => {
+      console.error('ffmpeg spawn error', err);
+    });
+    ff.stderr.on('data', (b: Buffer) => {
+      const s = b.toString();
+      // only log non-empty messages
+      if (s.trim()) console.error('ffmpeg:', s.trim());
+    });
+    ff.on('close', (code) => {
+      if (code && code !== 0) console.warn(`ffmpeg exited with code ${code} for ${nextUrl}`);
+    });
+
+    // create resource from ffmpeg stdout; if that fails, fallback to ytdl stream directly
+    let resource;
+    try {
+      resource = createAudioResource(ff.stdout, { inputType: StreamType.Raw, inlineVolume: true });
+    } catch (err) {
+      console.error('Failed to create resource from ffmpeg stdout, falling back to ytdl stream', err);
+      try {
+        resource = createAudioResource(ytdlStream, { inputType: StreamType.Arbitrary, inlineVolume: true });
+      } catch (err2) {
+        console.error('Fallback createAudioResource from ytdl also failed', err2);
+        throw err2;
+      }
+    }
     // set desired starting volume
     if (resource.volume) resource.volume.setVolume(gp.volume);
 
