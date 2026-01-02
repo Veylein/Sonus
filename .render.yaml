@@ -4,6 +4,6 @@ services:
     env: node
     region: oregon
     plan: free
-    buildCommand: "npm ci && npm run build"
+    buildCommand: "npm ci --include=dev && npm run build"
     startCommand: "npm ci && npm start"
     healthCheckPath: "/"
