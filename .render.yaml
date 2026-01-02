@@ -5,5 +5,5 @@ services:
     region: oregon
     plan: free
     buildCommand: "npm ci && npm run build"
-    startCommand: "npm start"
+    startCommand: "npm ci && npm start"
     healthCheckPath: "/"
