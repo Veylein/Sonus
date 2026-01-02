@@ -11,5 +11,13 @@
     "forceConsistentCasingInFileNames": true,
     "resolveJsonModule": true,
     "moduleResolution": "node"
-  }
+  },
+  "exclude": [
+    "node_modules",
+    "dist",
+    "scripts"
+  ],
+  "typeRoots": [
+    "./node_modules/@types"
+  ]
 }
