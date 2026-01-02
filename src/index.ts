@@ -6,7 +6,7 @@ try {
 } catch (e) {
   // ignore if dotenv is not installed in the environment
 }
-import { Client, Collection, GatewayIntentBits, Partials } from 'discord.js';
+import { Client, Collection, GatewayIntentBits, Partials, REST } from 'discord.js';
 import audioManager from './services/audioManager';
 import playlists from './services/playlists';
 import owners from '../config/owners.json';
@@ -50,6 +50,35 @@ client.once('ready', () => {
     audioManager.loadDefaultsForGuilds(guildIds).then(() => console.log('Default radios merged into guilds')).catch(() => {});
   } catch (err) {
     // ignore
+  }
+
+  // Auto-register slash commands to a guild if env vars are present (useful on deploy hosts)
+  try {
+    const clientId = process.env.CLIENT_ID;
+    const guildId = process.env.GUILD_ID;
+    if (clientId && guildId) {
+      const fs = require('fs');
+      const path = require('path');
+      const commands: any[] = [];
+      const commandsPath = path.join(__dirname, 'commands');
+      const commandFiles = fs.existsSync(commandsPath)
+        ? fs.readdirSync(commandsPath).filter((f: string) => f.endsWith('.js') || f.endsWith('.ts'))
+        : [];
+      for (const file of commandFiles) {
+        // eslint-disable-next-line @typescript-eslint/no-var-requires
+        const command = require(path.join(commandsPath, file));
+        const cmd = command.default ?? command;
+        if (cmd && cmd.data) commands.push(cmd.data.toJSON());
+      }
+      if (commands.length > 0) {
+        const rest = new REST({ version: '10' }).setToken(process.env.DISCORD_TOKEN || '');
+        rest.put(`/applications/${clientId}/guilds/${guildId}/commands`, { body: commands })
+          .then(() => console.log(`Registered ${commands.length} commands to guild ${guildId}`))
+          .catch((err: any) => console.error('Failed to register commands', err));
+      }
+    }
+  } catch (err) {
+    console.error('Auto-register commands error', err);
   }
 });
 
