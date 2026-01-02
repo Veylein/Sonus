@@ -4,6 +4,7 @@
   "description": "Sonus — Ultimate Discord Audio Ecosystem",
   "main": "dist/index.js",
   "scripts": {
+    "prebuild": "npm ci --include=dev",
     "build": "tsc",
     "start": "npm ci --production && node dist/index.js",
     "dev": "ts-node src/index.ts",
