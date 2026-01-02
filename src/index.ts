@@ -39,7 +39,7 @@ client.once('ready', () => {
   audioManager.init().then(() => console.log('AudioManager settings loaded')).catch(err => console.error(err));
   // Merge configured default radios into all guilds
   try {
-    const guildIds = Array.from(client.guilds.cache.keys());
+    const guildIds = Array.from(client.guilds.cache.keys()) as string[];
     audioManager.loadDefaultsForGuilds(guildIds).then(() => console.log('Default radios merged into guilds')).catch(() => {});
   } catch (err) {
     // ignore

@@ -1,4 +1,5 @@
-import { joinVoiceChannel, createAudioPlayer, AudioPlayerStatus, NoSubscriberBehavior, VoiceConnection, createAudioResource, AudioPlayer, AudioResource, VoiceConnectionStatus, StreamType } from '@discordjs/voice';
+import { joinVoiceChannel, createAudioPlayer, AudioPlayerStatus, NoSubscriberBehavior, VoiceConnectionStatus, createAudioResource, StreamType } from '@discordjs/voice';
+import type { VoiceConnection, AudioPlayer, AudioResource } from '@discordjs/voice';
 import type { VoiceChannel } from 'discord.js';
 import ytdl from 'ytdl-core';
 import { spawn } from 'child_process';
