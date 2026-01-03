@@ -55,6 +55,8 @@ async function sendLog(text: string, level: 'info' | 'error' = 'info') {
 const PREFIX = process.env.PREFIX || 'S!';
 const queue = new Map<string, { songs: string[]; player: any }>();
 
+const HELP_TEXT = `Commands:\n- play <url> or /play url: add YouTube URL to queue\n- pause or /pause: pause playback\n- resume or /resume: resume playback\n- skip or /skip: skip current track\n- stop or /stop: stop and clear queue\n- queue or /queue: show current queue\n- join or /join: make bot join your VC\n- leave or /leave: make bot leave VC\n- help or /help: show this help\n- ping or /ping: show latency`;
+
 async function playSong(guildId: string) {
   const serverQueue = queue.get(guildId);
   if (!serverQueue || serverQueue.songs.length === 0) {
@@ -145,6 +147,31 @@ client.on('messageCreate', async (message: any) => {
   }
 
   switch (command) {
+    case 'help':
+      message.reply(HELP_TEXT);
+      break;
+    case 'ping':
+      message.reply(`Pong! ${Math.round(client.ws.ping)}ms`);
+      break;
+    case 'join':
+      {
+        const existing = getVoiceConnection(message.guild.id);
+        if (existing) return message.reply('Already connected.');
+        const conn = joinVoiceChannel({ channelId: voiceChannel.id, guildId: message.guild.id, adapterCreator: message.guild.voiceAdapterCreator });
+        conn.subscribe(serverQueue.player);
+        message.reply('Joined voice channel.');
+      }
+      break;
+    case 'leave':
+      {
+        serverQueue.songs = [];
+        serverQueue.player.stop();
+        const conn = getVoiceConnection(message.guild.id);
+        conn?.destroy();
+        queue.delete(message.guild.id);
+        message.reply('Left voice channel.');
+      }
+      break;
     case 'play':
       if (!args[0]) return message.reply('Provide a YouTube URL!');
       serverQueue.songs.push(args[0]);
@@ -197,6 +224,10 @@ client.on('ready', async () => {
     new SlashCommandBuilder().setName('skip').setDescription('Skip current song'),
     new SlashCommandBuilder().setName('stop').setDescription('Stop playback'),
     new SlashCommandBuilder().setName('queue').setDescription('Show current queue'),
+    new SlashCommandBuilder().setName('help').setDescription('Show help about bot commands'),
+    new SlashCommandBuilder().setName('ping').setDescription('Check bot latency'),
+    new SlashCommandBuilder().setName('join').setDescription('Make the bot join your voice channel'),
+    new SlashCommandBuilder().setName('leave').setDescription('Make the bot leave voice channel'),
   ];
 
   try {
@@ -265,6 +296,31 @@ client.on('interactionCreate', async (interaction: any) => {
   }
 
   switch (command) {
+    case 'help':
+      await interaction.reply(HELP_TEXT);
+      break;
+    case 'ping':
+      await interaction.reply(`Pong! ${Math.round(client.ws.ping)}ms`);
+      break;
+    case 'join':
+      {
+        const existing = getVoiceConnection(interaction.guild.id);
+        if (existing) return interaction.reply('Already connected.');
+        const conn = joinVoiceChannel({ channelId: voiceChannel.id, guildId: interaction.guild.id, adapterCreator: interaction.guild.voiceAdapterCreator });
+        conn.subscribe(serverQueue.player);
+        await interaction.reply('Joined voice channel.');
+      }
+      break;
+    case 'leave':
+      {
+        serverQueue.songs = [];
+        serverQueue.player.stop();
+        const conn = getVoiceConnection(interaction.guild.id);
+        conn?.destroy();
+        queue.delete(interaction.guild.id);
+        await interaction.reply('Left voice channel.');
+      }
+      break;
     case 'play':
       const url = interaction.options.getString('url', true);
       serverQueue.songs.push(url);
