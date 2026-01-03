@@ -41,16 +41,37 @@ async function playSong(guildId: string) {
     queue.delete(guildId);
     return;
   }
-
   const song = serverQueue.songs[0];
-  const stream = ytdl(song, { filter: 'audioonly', highWaterMark: 1 << 25, quality: 'highestaudio' });
+  console.log(`playSong: guild=${guildId} starting ${song}`);
+  let stream;
+  try {
+    stream = ytdl(song, { filter: 'audioonly', highWaterMark: 1 << 25, quality: 'highestaudio' });
+  } catch (err) {
+    console.error(`ytdl failed to create stream for guild ${guildId}:`, err);
+    serverQueue.songs.shift();
+    // try next
+    setImmediate(() => playSong(guildId));
+    return;
+  }
   stream.on('error', (err) => {
     console.error(`ytdl stream error for guild ${guildId}:`, err);
   });
-  const resource = createAudioResource(stream, { inputType: StreamType.Arbitrary });
+
+  let resource;
+  try {
+    resource = createAudioResource(stream, { inputType: StreamType.Arbitrary });
+  } catch (err) {
+    console.error(`createAudioResource failed for guild ${guildId}:`, err);
+    serverQueue.songs.shift();
+    setImmediate(() => playSong(guildId));
+    return;
+  }
 
   serverQueue.player.play(resource);
+  console.log(`player.play called for guild=${guildId}`);
+
   serverQueue.player.once(AudioPlayerStatus.Idle, () => {
+    console.log(`player idle for guild=${guildId}, shifting queue`);
     serverQueue.songs.shift();
     playSong(guildId);
   });
@@ -72,6 +93,8 @@ client.on('messageCreate', async (message: any) => {
     player.on('error', (error) => {
       console.error(`Audio player error (message) guild=${message.guild?.id}:`, error);
     });
+    player.on(AudioPlayerStatus.Playing, () => console.log(`player status Playing (message) guild=${message.guild?.id}`));
+    player.on(AudioPlayerStatus.Idle, () => console.log(`player status Idle (message) guild=${message.guild?.id}`));
 
     serverQueue = {
       songs: [],
@@ -142,10 +165,30 @@ client.on('ready', async () => {
     new SlashCommandBuilder().setName('queue').setDescription('Show current queue'),
   ];
 
-  const guilds = client.guilds.cache.map(g => g.id);
-  for (const guildId of guilds) {
-    const guild = client.guilds.cache.get(guildId);
-    if (guild) await guild.commands.set(commands.map(c => c.toJSON()));
+  try {
+    console.log('Registering slash commands (global + per-guild)');
+    // register global commands (may take up to an hour to appear)
+    if (client.application?.commands) {
+      await client.application.commands.set(commands.map(c => c.toJSON()));
+      console.log('Registered global application commands');
+    }
+
+    // also try to set per-guild immediately for cached guilds
+    const guildIds = client.guilds.cache.map(g => g.id);
+    console.log('Found guilds:', guildIds);
+    for (const guildId of guildIds) {
+      const guild = client.guilds.cache.get(guildId);
+      if (guild) {
+        try {
+          await guild.commands.set(commands.map(c => c.toJSON()));
+          console.log(`Registered commands for guild ${guildId}`);
+        } catch (err) {
+          console.error(`Failed to register commands for guild ${guildId}:`, err);
+        }
+      }
+    }
+  } catch (err) {
+    console.error('Error registering commands:', err);
   }
 });
 
@@ -162,6 +205,8 @@ client.on('interactionCreate', async (interaction: any) => {
     player.on('error', (error) => {
       console.error(`Audio player error (interaction) guild=${interaction.guild?.id}:`, error);
     });
+    player.on(AudioPlayerStatus.Playing, () => console.log(`player status Playing (interaction) guild=${interaction.guild?.id}`));
+    player.on(AudioPlayerStatus.Idle, () => console.log(`player status Idle (interaction) guild=${interaction.guild?.id}`));
 
     serverQueue = { songs: [], player };
     queue.set(interaction.guild.id, serverQueue);
