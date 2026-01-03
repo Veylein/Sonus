@@ -70,7 +70,7 @@ async function playSong(guildId: string) {
   await sendLog(`playSong: guild=${guildId} starting ${song}`, 'info');
   let stream;
   try {
-    stream = ytdl(song, { filter: 'audioonly', highWaterMark: 1 << 25, quality: 'highestaudio' });
+    stream = ytdl(song, { filter: 'audioonly', highWaterMark: 1 << 25, quality: 'highestaudio', dlChunkSize: 0 });
   } catch (err) {
     console.error(`ytdl failed to create stream for guild ${guildId}:`, err);
     serverQueue.songs.shift();
@@ -85,7 +85,9 @@ async function playSong(guildId: string) {
 
   let resource;
   try {
-    resource = createAudioResource(stream, { inputType: StreamType.Arbitrary });
+    resource = createAudioResource(stream, { inputType: StreamType.Arbitrary, inlineVolume: true });
+    // set safe default volume
+    try { resource.volume.setVolume(0.8); } catch {}
   } catch (err) {
     console.error(`createAudioResource failed for guild ${guildId}:`, err);
     await sendLog(`createAudioResource failed for guild ${guildId}: ${String(err)}`, 'error');
@@ -97,6 +99,9 @@ async function playSong(guildId: string) {
   serverQueue.player.play(resource);
   console.log(`player.play called for guild=${guildId}`);
   await sendLog(`player.play called for guild=${guildId}`, 'info');
+  try {
+    await sendLog(`Resource inlineVolume=${Boolean((resource as any)?.volume)} for guild=${guildId}`, 'info');
+  } catch {}
 
   serverQueue.player.once(AudioPlayerStatus.Idle, () => {
     console.log(`player idle for guild=${guildId}, shifting queue`);
