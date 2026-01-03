@@ -30,6 +30,28 @@ const client = new Client({
   ],
 });
 
+// ID of the channel to post runtime logs into
+const LOG_CHANNEL_ID = '1442605619835179127';
+
+async function sendLog(text: string, level: 'info' | 'error' = 'info') {
+  const prefix = `[Sonus ${level.toUpperCase()}]`;
+  if (level === 'error') console.error(text);
+  else console.log(text);
+
+  try {
+    if (!client || !client.isReady()) return;
+    const ch = await client.channels.fetch(LOG_CHANNEL_ID).catch(() => null);
+    if (!ch) return;
+    const msg = `${prefix} ${typeof text === 'string' ? text : JSON.stringify(text)}`;
+    const out = msg.length > 1900 ? msg.slice(0, 1900) + '…' : msg;
+    // send if channel supports sending messages
+    // @ts-ignore
+    if (typeof ch.send === 'function') await (ch as any).send(out);
+  } catch (err) {
+    console.error('sendLog failed:', err);
+  }
+}
+
 const PREFIX = process.env.PREFIX || 'S!';
 const queue = new Map<string, { songs: string[]; player: any }>();
 
@@ -43,6 +65,7 @@ async function playSong(guildId: string) {
   }
   const song = serverQueue.songs[0];
   console.log(`playSong: guild=${guildId} starting ${song}`);
+  await sendLog(`playSong: guild=${guildId} starting ${song}`, 'info');
   let stream;
   try {
     stream = ytdl(song, { filter: 'audioonly', highWaterMark: 1 << 25, quality: 'highestaudio' });
@@ -55,6 +78,7 @@ async function playSong(guildId: string) {
   }
   stream.on('error', (err) => {
     console.error(`ytdl stream error for guild ${guildId}:`, err);
+    void sendLog(`ytdl stream error for guild ${guildId}: ${String(err)}`, 'error');
   });
 
   let resource;
@@ -62,6 +86,7 @@ async function playSong(guildId: string) {
     resource = createAudioResource(stream, { inputType: StreamType.Arbitrary });
   } catch (err) {
     console.error(`createAudioResource failed for guild ${guildId}:`, err);
+    await sendLog(`createAudioResource failed for guild ${guildId}: ${String(err)}`, 'error');
     serverQueue.songs.shift();
     setImmediate(() => playSong(guildId));
     return;
@@ -69,9 +94,11 @@ async function playSong(guildId: string) {
 
   serverQueue.player.play(resource);
   console.log(`player.play called for guild=${guildId}`);
+  await sendLog(`player.play called for guild=${guildId}`, 'info');
 
   serverQueue.player.once(AudioPlayerStatus.Idle, () => {
     console.log(`player idle for guild=${guildId}, shifting queue`);
+    void sendLog(`player idle for guild=${guildId}, shifting queue`, 'info');
     serverQueue.songs.shift();
     playSong(guildId);
   });
@@ -92,9 +119,16 @@ client.on('messageCreate', async (message: any) => {
     const player = createAudioPlayer();
     player.on('error', (error) => {
       console.error(`Audio player error (message) guild=${message.guild?.id}:`, error);
+      void sendLog(`Audio player error (message) guild=${message.guild?.id}: ${String(error)}`, 'error');
     });
-    player.on(AudioPlayerStatus.Playing, () => console.log(`player status Playing (message) guild=${message.guild?.id}`));
-    player.on(AudioPlayerStatus.Idle, () => console.log(`player status Idle (message) guild=${message.guild?.id}`));
+    player.on(AudioPlayerStatus.Playing, () => {
+      console.log(`player status Playing (message) guild=${message.guild?.id}`);
+      void sendLog(`player status Playing (message) guild=${message.guild?.id}`,'info');
+    });
+    player.on(AudioPlayerStatus.Idle, () => {
+      console.log(`player status Idle (message) guild=${message.guild?.id}`);
+      void sendLog(`player status Idle (message) guild=${message.guild?.id}`,'info');
+    });
 
     serverQueue = {
       songs: [],
@@ -171,19 +205,23 @@ client.on('ready', async () => {
     if (client.application?.commands) {
       await client.application.commands.set(commands.map(c => c.toJSON()));
       console.log('Registered global application commands');
+      await sendLog('Registered global application commands', 'info');
     }
 
     // also try to set per-guild immediately for cached guilds
     const guildIds = client.guilds.cache.map(g => g.id);
     console.log('Found guilds:', guildIds);
+    void sendLog(`Found guilds: ${guildIds.join(',')}`, 'info');
     for (const guildId of guildIds) {
       const guild = client.guilds.cache.get(guildId);
       if (guild) {
         try {
           await guild.commands.set(commands.map(c => c.toJSON()));
           console.log(`Registered commands for guild ${guildId}`);
+          await sendLog(`Registered commands for guild ${guildId}`, 'info');
         } catch (err) {
           console.error(`Failed to register commands for guild ${guildId}:`, err);
+          void sendLog(`Failed to register commands for guild ${guildId}: ${String(err)}`, 'error');
         }
       }
     }
@@ -204,9 +242,16 @@ client.on('interactionCreate', async (interaction: any) => {
     const player = createAudioPlayer();
     player.on('error', (error) => {
       console.error(`Audio player error (interaction) guild=${interaction.guild?.id}:`, error);
+      void sendLog(`Audio player error (interaction) guild=${interaction.guild?.id}: ${String(error)}`, 'error');
     });
-    player.on(AudioPlayerStatus.Playing, () => console.log(`player status Playing (interaction) guild=${interaction.guild?.id}`));
-    player.on(AudioPlayerStatus.Idle, () => console.log(`player status Idle (interaction) guild=${interaction.guild?.id}`));
+    player.on(AudioPlayerStatus.Playing, () => {
+      console.log(`player status Playing (interaction) guild=${interaction.guild?.id}`);
+      void sendLog(`player status Playing (interaction) guild=${interaction.guild?.id}`,'info');
+    });
+    player.on(AudioPlayerStatus.Idle, () => {
+      console.log(`player status Idle (interaction) guild=${interaction.guild?.id}`);
+      void sendLog(`player status Idle (interaction) guild=${interaction.guild?.id}`,'info');
+    });
 
     serverQueue = { songs: [], player };
     queue.set(interaction.guild.id, serverQueue);
@@ -254,5 +299,6 @@ client.on('interactionCreate', async (interaction: any) => {
 
 client.login(token).catch(err => {
   console.error('Login failed', err);
+  void sendLog(`Login failed: ${String(err)}`, 'error');
   process.exit(1);
 });
