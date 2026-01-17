@@ -1,17 +1,19 @@
-from collections import deque
+from discord import Embed
 
-class TrackQueue:
-    def __init__(self):
-        self._q = deque()
 
-    def add(self, track):
-        self._q.append(track)
+def register(bot):
+    @bot.command(name="queue")
+    async def _queue(ctx):
+        try:
+            items = bot.player.all()
+        except Exception:
+            items = getattr(bot, "sonus_queue", [])
 
-    def pop(self):
-        return self._q.popleft() if self._q else None
+        if not items:
+            await ctx.send("Queue is empty")
+            return
 
-    def peek(self):
-        return self._q[0] if self._q else None
-
-    def all(self):
-        return list(self._q)
+        e = Embed(title="Queue")
+        for i, t in enumerate(items[:10], start=1):
+            e.add_field(name=f"{i}. {t.get('title')}", value=t.get("uri", ""), inline=False)
+        await ctx.send(embed=e)
