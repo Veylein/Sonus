@@ -22,6 +22,9 @@ def _owner_check(ctx: commands.Context) -> bool:
 
 
 def register(bot: commands.Bot):
+    # expose owner ids on bot for other modules
+    bot.owner_ids = OWNER_IDS
+
     @bot.check
     def _global_owner_check(ctx: commands.Context):
         # Only apply owner gates to owner-only commands explicitly.
