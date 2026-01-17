@@ -7,6 +7,8 @@ from discord.ext import commands
 
 from src.config import Config
 from src.logger import setup_logger
+from src.audio.player import Player
+from src.audio.queue import TrackQueue
 
 logger = setup_logger(__name__)
 
@@ -58,6 +60,13 @@ def create_bot():
 
     bot.config = Config()
     bot.logger = logger
+
+    # attach lightweight in-memory audio primitives
+    try:
+        bot.player = Player()
+        bot.track_queue = TrackQueue()
+    except Exception:
+        logger.exception("Failed to attach audio primitives")
 
     # Auto-register event and command modules found under src.events and src.commands
     _register_event_modules(bot)
