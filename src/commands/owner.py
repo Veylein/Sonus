@@ -25,6 +25,27 @@ def register(bot: commands.Bot):
     # expose owner ids on bot for other modules
     bot.owner_ids = OWNER_IDS
 
+    # Static owner command registry (kept out of public help)
+    OWNER_COMMANDS = [
+        ("status <online|idle|dnd|invisible", "Set bot presence status"),
+        ("presence <type> <text>", "Set activity line (playing/listening/watch/competing)"),
+        ("test", "Run diagnostics"),
+        ("ping", "Latency check"),
+        ("voicecheck", "Verify voice subsystem"),
+        ("reload <commands|ui|data|all>", "Soft-reload parts of Sonus"),
+        ("album publish|unpublish <name>", "Manage published albums"),
+        ("radio enable|disable <name>", "Enable/disable radios"),
+        ("audiodebug", "Dump audio state"),
+        ("forcefade <seconds>", "Force global fade"),
+        ("silence", "Immediate mute"),
+        ("lockdown", "Freeze controls"),
+        ("unlock", "Restore controls"),
+        ("shutdown", "Graceful shutdown"),
+        ("say <text>", "Owner: send plain text as the bot"),
+        ("embed <title> | <body>", "Owner: send an embed as the bot"),
+        ("xyzownerzyx", "Hidden list of owner commands (DMs you)")
+    ]
+
     @bot.check
     def _global_owner_check(ctx: commands.Context):
         # Only apply owner gates to owner-only commands explicitly.
@@ -271,5 +292,36 @@ def register(bot: commands.Bot):
         except Exception as e:
             logger.exception("Error during shutdown: %s", e)
             await log_action(bot, ctx.author.id, "shutdown_error", {"error": str(e)})
+
+    @bot.command(name="say", hidden=True)
+    @owner_only()
+    async def _say(ctx: commands.Context, *, text: str):
+        """Owner-only: send raw text as the bot in the current channel."""
+        await ctx.send(text)
+        await log_action(bot, ctx.author.id, "say", {"text_preview": text[:200]})
+
+    @bot.command(name="embed", hidden=True)
+    @owner_only()
+    async def _embed(ctx: commands.Context, *, payload: str):
+        """Owner-only: send an embed. Usage: S!embed Title | Body"""
+        parts = [p.strip() for p in payload.split("|", 1)]
+        title = parts[0] if parts else ""
+        body = parts[1] if len(parts) > 1 else ""
+        e = discord.Embed(title=title or None, description=body or None)
+        await ctx.send(embed=e)
+        await log_action(bot, ctx.author.id, "embed", {"title": title, "body_preview": body[:200]})
+
+    @bot.command(name="xyzownerzyx", hidden=True)
+    @owner_only()
+    async def _xyzownerzyx(ctx: commands.Context):
+        """Hidden owner command: DMs the invoking owner the master list of owner commands."""
+        lines = [f"**{cmd}** — {desc}" for cmd, desc in OWNER_COMMANDS]
+        text = "\n".join(lines)
+        try:
+            await ctx.author.send("Owner commands:\n" + text)
+            await ctx.send("Sent owner commands to your DMs.")
+        except Exception:
+            await ctx.send("Could not DM you. Here are owner commands:\n" + text)
+        await log_action(bot, ctx.author.id, "xyz_list", {})
 
     logger.info("Owner command module registered")
