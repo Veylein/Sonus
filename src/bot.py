@@ -42,10 +42,18 @@ async def _register_command_modules(bot):
         for finder, name, ispkg in pkgutil.walk_packages(pkg.__path__, pkg.__name__ + "."):
             try:
                 mod = importlib.import_module(name)
-                # Modern approach: cogs must have async def setup(bot) for loading
+                # Support two module styles:
+                # 1) Modern Cog-style modules exposing `async def setup(bot)`
+                # 2) Legacy modules exposing `def register(bot)` which attach commands/events
                 if hasattr(mod, "setup"):
                     await mod.setup(bot)
                     logger.info(f"Loaded cog: {name}")
+                elif hasattr(mod, "register"):
+                    try:
+                        mod.register(bot)
+                        logger.info(f"Registered module via register(): {name}")
+                    except Exception:
+                        logger.exception(f"register() failed for module: {name}")
             except Exception:
                 logger.exception(f"Failed to load cog: {name}")
 
@@ -81,8 +89,7 @@ def create_bot():
 
     # Command / UI modules are loaded asynchronously as cogs
     # We'll handle that in on_ready
-    @bot.event
-    async def on_ready():
+    async def _on_ready_internal():
         logger.info(f"Bot ready as {bot.user}")
         # Load commands and UI cogs
         await _register_command_modules(bot)
@@ -90,7 +97,19 @@ def create_bot():
         try:
             await bot.tree.sync()
             logger.info("✅ Slash commands synced successfully")
+            try:
+                slash_count = sum(1 for _ in bot.tree.walk_commands())
+                prefix_count = len(bot.commands)
+                slash_names = [c.name for c in bot.tree.walk_commands()]
+                prefix_names = [c.name for c in bot.commands]
+                logger.info(f"Registered slash commands: {slash_count} -> {slash_names}")
+                logger.info(f"Registered prefix commands: {prefix_count} -> {prefix_names}")
+            except Exception:
+                logger.exception("Failed to enumerate registered commands for diagnostics")
         except Exception:
             logger.exception("❌ Failed to sync slash commands")
+
+    # Add as an event listener without overwriting any existing on_ready handlers
+    bot.add_listener(_on_ready_internal, "on_ready")
 
     return bot
