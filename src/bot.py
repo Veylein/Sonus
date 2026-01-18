@@ -30,44 +30,30 @@ def _register_event_modules(bot):
             logger.exception(f"Failed to register event module: {full}")
 
 
-def _register_command_modules(bot):
-    try:
-        import src.commands as commands_pkg
-    except Exception:
-        logger.exception("Could not import src.commands package")
-        return
-
-    for finder, name, ispkg in pkgutil.walk_packages(commands_pkg.__path__, commands_pkg.__name__ + "."):
+async def _register_command_modules(bot):
+    """Automatically load all cogs from src.commands and src.ui as Cogs."""
+    for pkg_name in ["src.commands", "src.ui"]:
         try:
-            mod = importlib.import_module(name)
-            if hasattr(mod, "register"):
-                mod.register(bot)
-                logger.info(f"Registered command module: {name}")
+            pkg = importlib.import_module(pkg_name)
         except Exception:
-            logger.exception(f"Failed to register command module: {name}")
+            logger.exception(f"Could not import {pkg_name} package")
+            continue
 
-
-def _register_ui_modules(bot):
-    try:
-        import src.ui as ui_pkg
-    except Exception:
-        logger.exception("Could not import src.ui package")
-        return
-
-    for finder, name, ispkg in pkgutil.iter_modules(ui_pkg.__path__):
-        full = f"{ui_pkg.__name__}.{name}"
-        try:
-            mod = importlib.import_module(full)
-            if hasattr(mod, "register"):
-                mod.register(bot)
-                logger.info(f"Registered ui module: {full}")
-        except Exception:
-            logger.exception(f"Failed to register ui module: {full}")
+        for finder, name, ispkg in pkgutil.walk_packages(pkg.__path__, pkg.__name__ + "."):
+            try:
+                mod = importlib.import_module(name)
+                # Modern approach: cogs must have async def setup(bot) for loading
+                if hasattr(mod, "setup"):
+                    await mod.setup(bot)
+                    logger.info(f"Loaded cog: {name}")
+            except Exception:
+                logger.exception(f"Failed to load cog: {name}")
 
 
 def create_bot():
     intents = discord.Intents.default()
     intents.message_content = True
+    intents.guilds = True
     intents.voice_states = True
 
     bot = commands.Bot(
@@ -86,14 +72,25 @@ def create_bot():
 
             bot.track_queue = TrackQueue()
         except Exception:
-            # fallback to simple list-based queue if import fails
             bot.track_queue = []
     except Exception:
         logger.exception("Failed to attach audio primitives")
 
-    # Auto-register event and command modules found under src.events and src.commands
+    # Auto-register event modules
     _register_event_modules(bot)
-    _register_command_modules(bot)
-    _register_ui_modules(bot)
+
+    # Command / UI modules are loaded asynchronously as cogs
+    # We'll handle that in on_ready
+    @bot.event
+    async def on_ready():
+        logger.info(f"Bot ready as {bot.user}")
+        # Load commands and UI cogs
+        await _register_command_modules(bot)
+        # Sync slash commands globally
+        try:
+            await bot.tree.sync()
+            logger.info("✅ Slash commands synced successfully")
+        except Exception:
+            logger.exception("❌ Failed to sync slash commands")
 
     return bot
