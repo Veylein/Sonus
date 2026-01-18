@@ -47,6 +47,24 @@ def _register_command_modules(bot):
             logger.exception(f"Failed to register command module: {name}")
 
 
+def _register_ui_modules(bot):
+    try:
+        import src.ui as ui_pkg
+    except Exception:
+        logger.exception("Could not import src.ui package")
+        return
+
+    for finder, name, ispkg in pkgutil.iter_modules(ui_pkg.__path__):
+        full = f"{ui_pkg.__name__}.{name}"
+        try:
+            mod = importlib.import_module(full)
+            if hasattr(mod, "register"):
+                mod.register(bot)
+                logger.info(f"Registered ui module: {full}")
+        except Exception:
+            logger.exception(f"Failed to register ui module: {full}")
+
+
 def create_bot():
     intents = discord.Intents.default()
     intents.message_content = True
@@ -76,5 +94,6 @@ def create_bot():
     # Auto-register event and command modules found under src.events and src.commands
     _register_event_modules(bot)
     _register_command_modules(bot)
+    _register_ui_modules(bot)
 
     return bot
