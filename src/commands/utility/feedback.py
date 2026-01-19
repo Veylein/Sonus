@@ -16,7 +16,16 @@ def register(bot: commands.Bot):
         """Prefix command: S!feedback <text>"""
         success = await _handle_feedback(bot, author=ctx.author, content=text)
         if success:
-            await ctx.send("✅ Thanks — your feedback was sent to the devs.")
+            try:
+                await ctx.send("✅ Thanks — your feedback was sent to the devs.")
+            except Exception:
+                # sending in-channel failed; still attempt to DM the user
+                pass
+            try:
+                await ctx.author.send("✅ Thanks — your feedback was sent to the devs.")
+            except Exception:
+                # user may have DMs closed; ignore
+                pass
         else:
             await ctx.send("❌ Sorry — I couldn't deliver your feedback. The devs have been notified.")
         await log_action(bot, ctx.author.id, "feedback_prefix", {"text_preview": text[:200], "delivered": success})
@@ -28,24 +37,37 @@ def register(bot: commands.Bot):
         await interaction.response.defer(ephemeral=True)
         success = await _handle_feedback(bot, author=interaction.user, content=text)
         if success:
-            await interaction.followup.send("✅ Thanks — your feedback was sent to the devs.", ephemeral=True)
+            try:
+                await interaction.followup.send("✅ Thanks — your feedback was sent to the devs.", ephemeral=True)
+            except Exception:
+                pass
+            try:
+                await interaction.user.send("✅ Thanks — your feedback was sent to the devs.")
+            except Exception:
+                # DMs may be closed; ignore
+                pass
         else:
             await interaction.followup.send("❌ Sorry — I couldn't deliver your feedback. The devs have been notified.", ephemeral=True)
         await log_action(bot, interaction.user.id, "feedback_slash", {"text_preview": text[:200], "delivered": success})
 
 
 async def _handle_feedback(bot: commands.Bot, author: discord.abc.User, content: str) -> bool:
-    # Build an embed for devs. Use description (larger limit) and clamp to safe size.
+    # Build an embed for devs but also send a plain text fallback
     e = discord.Embed(title="User Feedback", color=0x1DB954)
     e.add_field(name="From", value=f"{author} (ID: {author.id})", inline=False)
     safe_content = (content or "(empty)")[:3900]
     e.description = safe_content
+    text_payload = f"[{getattr(author, 'display_name', str(author))}] ID:{author.id} says:\n```\n{safe_content[:1900]}\n```"
     try:
         # Try get cached channel first
         ch = bot.get_channel(FEEDBACK_CHANNEL)
         if ch is None:
             ch = await bot.fetch_channel(FEEDBACK_CHANNEL)
-        await ch.send(embed=e)
+        # Prefer sending rich embed, but fall back to plain text if channel doesn't support embeds
+        try:
+            await ch.send(content=text_payload, embed=e)
+        except Exception:
+            await ch.send(text_payload)
         return True
     except Exception:
         logger.exception("Failed to deliver feedback to dev channel")
