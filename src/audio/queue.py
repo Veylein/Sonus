@@ -8,19 +8,22 @@ class TrackQueue:
     def __init__(self):
         self._items = deque()
 
-    def add(self, item: dict[str, Any]):
+    def enqueue(self, item: dict[str, Any]):
         self._items.append(item)
 
-    def pop(self):
+    def add(self, item: dict[str, Any]):
+        self.enqueue(item)
+
+    def dequeue(self):
         if not self._items:
             return None
         return self._items.popleft()
 
+    def pop(self):
+        return self.dequeue()
+
     def all(self):
         return list(self._items)
-
-    def dequeue(self):
-        return self.pop()
 
 
 def register(bot):
