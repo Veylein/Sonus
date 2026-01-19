@@ -1,95 +1,50 @@
-import { Client, GatewayIntentBits, SlashCommandBuilder, Routes } from 'discord.js';
-import { REST } from '@discordjs/rest';
-import 'dotenv/config';
+import discord
+from discord.ext import commands
+from discord import app_commands
 
-const client = new Client({
-    intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages, GatewayIntentBits.MessageContent, GatewayIntentBits.DirectMessages],
-    partials: ['CHANNEL'], // Needed to DM users
-});
+FEEDBACK_CHANNEL_ID = 1462019751218778112
 
-const FEEDBACK_CHANNEL_ID = '1462019751218778112';
-const PREFIX = 'S!';
+class Feedback(commands.Cog):
+    def __init__(self, bot):
+        self.bot = bot
 
-// Register slash command globally
-const commands = [
-    new SlashCommandBuilder()
-        .setName('feedback')
-        .setDescription('Send feedback to the devs')
-        .addStringOption(option =>
-            option.setName('text')
-                .setDescription('Your feedback')
-                .setRequired(true)
-        )
-].map(cmd => cmd.toJSON());
+    # ------------------------
+    # Prefix command
+    # ------------------------
+    @commands.command(name="feedback")
+    async def feedback_prefix(self, ctx: commands.Context, *, text: str):
+        channel = self.bot.get_channel(FEEDBACK_CHANNEL_ID)
+        if not channel or not isinstance(channel, discord.TextChannel):
+            await ctx.send("Feedback channel not found.")
+            return
 
-const rest = new REST({ version: '10' }).setToken(process.env.SONUS_TOKEN);
+        try:
+            await channel.send(f"[{ctx.author}] ID:{ctx.author.id} says `{text}`")
+            await ctx.author.send("Your feedback was sent")
+        except Exception:
+            await ctx.author.send("Feedback could not be sent, the devs have been notified")
+            await channel.send(f"[{ctx.author}] could not send feedback")
 
-(async () => {
-    try {
-        console.log('Registering slash commands globally...');
-        await rest.put(
-            Routes.applicationCommands(process.env.CLIENT_ID),
-            { body: commands }
-        );
-        console.log('Slash commands registered.');
-    } catch (error) {
-        console.error(error);
-    }
-})();
+    # ------------------------
+    # Slash command
+    # ------------------------
+    @app_commands.command(name="feedback", description="Send feedback to the devs")
+    @app_commands.describe(text="Your feedback")
+    async def feedback_slash(self, interaction: discord.Interaction, text: str):
+        channel = self.bot.get_channel(FEEDBACK_CHANNEL_ID)
+        if not channel or not isinstance(channel, discord.TextChannel):
+            await interaction.response.send_message("Feedback channel not found.", ephemeral=True)
+            return
 
-client.on('ready', () => {
-    console.log(`Logged in as ${client.user.tag}`);
-});
+        try:
+            await channel.send(f"[{interaction.user}] ID:{interaction.user.id} says `{text}`")
+            await interaction.user.send("Your feedback was sent")
+            await interaction.response.send_message("Feedback sent successfully!", ephemeral=True)
+        except Exception:
+            await interaction.user.send("Feedback could not be sent, the devs have been notified")
+            await channel.send(f"[{interaction.user}] could not send feedback")
+            await interaction.response.send_message("There was an error sending your feedback.", ephemeral=True)
 
-// Handle prefix commands
-client.on('messageCreate', async (message) => {
-    if (message.author.bot) return;
-    if (!message.content.startsWith(PREFIX)) return;
-
-    const args = message.content.slice(PREFIX.length).trim().split(/ +/);
-    const command = args.shift().toLowerCase();
-
-    if (command === 'feedback') {
-        const feedback = args.join(' ');
-        if (!feedback) return message.reply('Please provide feedback text.');
-
-        const channel = await client.channels.fetch(FEEDBACK_CHANNEL_ID).catch(() => null);
-        if (!channel?.isTextBased()) return message.reply('Feedback channel not found.');
-
-        try {
-            await channel.send(`[${message.author.tag}] ID:${message.author.id} says \`${feedback}\``);
-            await message.author.send('Your feedback was sent');
-        } catch (err) {
-            console.error(err);
-            await message.author.send('Feedback could not be sent, the devs have been notified');
-            if (channel) await channel.send(`[${message.author.tag}] could not send feedback`);
-        }
-    }
-});
-
-// Handle slash commands
-client.on('interactionCreate', async (interaction) => {
-    if (!interaction.isChatInputCommand()) return;
-
-    if (interaction.commandName === 'feedback') {
-        const feedback = interaction.options.getString('text');
-        const channel = await client.channels.fetch(FEEDBACK_CHANNEL_ID).catch(() => null);
-
-        if (!channel?.isTextBased()) {
-            return interaction.reply({ content: 'Feedback channel not found.', ephemeral: true });
-        }
-
-        try {
-            await channel.send(`[${interaction.user.tag}] ID:${interaction.user.id} says \`${feedback}\``);
-            await interaction.user.send('Your feedback was sent');
-            await interaction.reply({ content: 'Feedback sent successfully!', ephemeral: true });
-        } catch (err) {
-            console.error(err);
-            await interaction.user.send('Feedback could not be sent, the devs have been notified');
-            if (channel) await channel.send(`[${interaction.user.tag}] could not send feedback`);
-            await interaction.reply({ content: 'There was an error sending your feedback.', ephemeral: true });
-        }
-    }
-});
-
-client.login(process.env.SONUS_TOKEN);
+# Required by your loader
+async def setup(bot):
+    await bot.add_cog(Feedback(bot))
