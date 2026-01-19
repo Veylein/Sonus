@@ -79,7 +79,8 @@ def create_bot():
 
     bot = commands.Bot(
         command_prefix=_get_prefix,
-        intents=intents
+        intents=intents,
+        help_command=None,
     )
 
     bot.config = Config()

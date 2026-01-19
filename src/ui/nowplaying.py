@@ -1,4 +1,5 @@
 import asyncio
+import time
 import discord
 from discord import Embed
 from discord.ext import commands
@@ -10,40 +11,72 @@ VIEW_TIMEOUT = None
 def _build_embed(track: Optional[dict]) -> Embed:
     if not track:
         return Embed(title="Now Playing", description="Nothing is playing.")
-
     title = track.get('title', 'Unknown')
-    url = track.get('webpage_url') or track.get('url')
+    url = track.get('webpage_url') or track.get('url') or track.get('source')
     thumb = track.get('thumbnail') or (track.get('thumbnails') and (track.get('thumbnails')[-1].get('url') if isinstance(track.get('thumbnails')[-1], dict) else None))
+    uploader = track.get('uploader') or track.get('artist')
+    requester = track.get('requested_by') or track.get('requester') or track.get('user')
+    duration = track.get('duration')
+    started_at = track.get('started_at')
 
-    e = Embed(title=title, description=f"Now playing — **{title}**", color=0x1DB954)
+    e = Embed(title=title[:256], description=uploader or "Now playing", color=0x1DB954, url=url)
     if thumb:
         try:
             e.set_thumbnail(url=thumb)
         except Exception:
             pass
 
+    # progress and timing
+    def _fmt(s: int) -> str:
+        h = s // 3600
+        m = (s % 3600) // 60
+        sec = s % 60
+        if h:
+            return f"{h:d}:{m:02d}:{sec:02d}"
+        return f"{m:d}:{sec:02d}"
+
+    elapsed = 0
+    progress_bar = None
+    if started_at:
+        try:
+            elapsed = int(max(0, time.time() - float(started_at)))
+        except Exception:
+            elapsed = 0
+
+    if duration:
+        try:
+            total = int(duration)
+            elapsed_clamped = min(total, max(0, int(elapsed)))
+            ratio = elapsed_clamped / total if total > 0 else 0.0
+            bar_len = 12
+            filled = int(round(ratio * bar_len))
+            bar = '█' * filled + '─' * (bar_len - filled)
+            progress_bar = f"{_fmt(elapsed_clamped)} [{bar}] {_fmt(total)}"
+        except Exception:
+            progress_bar = None
+    else:
+        if started_at:
+            progress_bar = f"Elapsed: {_fmt(elapsed)}"
+
+    if progress_bar:
+        e.add_field(name="Progress", value=progress_bar, inline=False)
+
+    # small metadata fields
+    if uploader:
+        e.add_field(name="Uploader", value=str(uploader), inline=True)
+    if requester:
+        e.add_field(name="Requested by", value=str(requester), inline=True)
     if url:
         e.add_field(name="Source", value=f"[Open]({url})", inline=True)
 
-    # extra metadata if present
-    duration = track.get('duration')
-    requester = track.get('requester') or track.get('requested_by') or track.get('user')
-    if duration:
-        # format duration mm:ss or hh:mm:ss
-        def _fmt(s: int) -> str:
-            h = s // 3600
-            m = (s % 3600) // 60
-            sec = s % 60
-            if h:
-                return f"{h:d}:{m:02d}:{sec:02d}"
-            return f"{m:d}:{sec:02d}"
+    # set image to thumbnail if present for a richer card
+    try:
+        if thumb:
+            e.set_image(url=thumb)
+    except Exception:
+        pass
 
-        e.add_field(name="Duration", value=_fmt(int(duration)), inline=True)
-    if requester:
-        e.add_field(name="Requested by", value=str(requester), inline=True)
-
-    # small footer placeholder; actual state updated when editing
-    e.set_footer(text="Status: playing")
+    e.set_footer(text="Sonus — now playing")
     return e
 
 
