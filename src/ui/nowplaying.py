@@ -4,7 +4,7 @@ from discord import Embed
 from discord.ext import commands
 from typing import Optional
 
-VIEW_TIMEOUT = 3600
+VIEW_TIMEOUT = None
 
 
 def _build_embed(track: Optional[dict]) -> Embed:
@@ -151,3 +151,16 @@ def register(bot: commands.Bot):
     # start background updater task
     if not hasattr(bot, '_sonus_now_updater'):
         bot._sonus_now_updater = bot.loop.create_task(_updater_loop(bot))
+
+    # Ensure persistent views are registered for existing now-playing messages
+    try:
+        meta = getattr(bot, 'sonus_now_message_meta', {}) or {}
+        for guild_id, m in list(meta.items()):
+            try:
+                # Register a persistent view for the message so button interactions work across restarts
+                view = NowPlayingView(bot, guild_id)
+                bot.add_view(view, message_id=m.get('message_id'))
+            except Exception:
+                pass
+    except Exception:
+        pass

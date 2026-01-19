@@ -93,6 +93,21 @@ def create_bot():
         logger.info(f"Bot ready as {bot.user}")
         # Load commands and UI cogs
         await _register_command_modules(bot)
+        # mark that command modules have been loaded
+        try:
+            setattr(bot, "sonus_commands_loaded", True)
+        except Exception:
+            pass
+        # set application id if provided in config to help some sync paths
+        try:
+            if getattr(bot.config, "APP_ID", None):
+                try:
+                    bot.application_id = int(bot.config.APP_ID)
+                except Exception:
+                    # ignore invalid APP_ID format
+                    pass
+        except Exception:
+            pass
         # Sync slash commands globally
         try:
             await bot.tree.sync()

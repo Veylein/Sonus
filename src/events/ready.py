@@ -10,13 +10,18 @@ def register(bot):
         logger.info(f"Logged in as {bot.user} (id={bot.user.id})")
         # Sync application commands to the development guild when available
         try:
-            gid = getattr(bot.config, "GUILD_ID", None)
-            if gid:
-                await bot.tree.sync(guild=discord.Object(id=int(gid)))
-                logger.info("Synced app commands to guild %s", gid)
+            # If commands were already loaded by the main create_bot ready handler,
+            # skip syncing here to avoid race conditions and duplicate sync calls.
+            if getattr(bot, "sonus_commands_loaded", False):
+                logger.debug("Command modules already loaded; skipping sync in events.ready")
             else:
-                await bot.tree.sync()
-                logger.info("Synced global app commands")
+                gid = getattr(bot.config, "GUILD_ID", None)
+                if gid:
+                    await bot.tree.sync(guild=discord.Object(id=int(gid)))
+                    logger.info("Synced app commands to guild %s", gid)
+                else:
+                    await bot.tree.sync()
+                    logger.info("Synced global app commands")
         except Exception:
             logger.exception("Failed to sync app commands")
 
