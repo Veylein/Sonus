@@ -9,6 +9,15 @@ logger = setup_logger(__name__)
 
 
 def register(bot: commands.Bot):
+    # helper to extract help text from a command
+    def _cmd_help_text(cmd: commands.Command) -> str:
+        if cmd.help:
+            return cmd.help
+        doc = getattr(getattr(cmd, 'callback', None), '__doc__', None)
+        if doc:
+            return doc.strip().splitlines()[0]
+        return 'No description provided.'
+
     # -----------------------
     # Prefix command
     # -----------------------
@@ -23,14 +32,12 @@ def register(bot: commands.Bot):
             color = settings.get("color", "#1DB954")
             color_int = int(color.lstrip("#"), 16) if isinstance(color, str) and color.startswith("#") else 0x1DB954
 
-            def _cmd_help_text(cmd: commands.Command) -> str:
-                # Prefer explicit help, then callback docstring, then a fallback.
-                if cmd.help:
-                    return cmd.help
-                doc = getattr(getattr(cmd, 'callback', None), '__doc__', None)
-                if doc:
-                    return doc.strip().splitlines()[0]
-                return 'No description provided.'
+            # Populate missing command.help from docstring where possible
+            for c in bot.commands:
+                if not c.help:
+                    doc = getattr(getattr(c, 'callback', None), '__doc__', None)
+                    if doc:
+                        c.help = doc.strip().splitlines()[0]
 
             # Detailed view for a single command
             if command_name:
@@ -74,51 +81,58 @@ def register(bot: commands.Bot):
     # -----------------------
     # Slash command
     # -----------------------
-        if bot.tree.get_command('help') is None:
-            @bot.tree.command(
-                name="help",
-                description="Show help for bot commands. Optionally provide a command name."
-            )
-            @app_commands.describe(command_name="Optional command name to show detailed help for")
-            async def _help_slash(interaction: discord.Interaction, command_name: str | None = None):
-                settings = load_guild_settings(interaction.guild.id) if interaction.guild else {"prefix": "S!", "color": "#1DB954"}
-                prefix = settings.get("prefix", "S!")
-                color = settings.get("color", "#1DB954")
-                color_int = int(color.lstrip("#"), 16) if isinstance(color, str) and color.startswith("#") else 0x1DB954
+    if bot.tree.get_command('help') is None:
+        @bot.tree.command(
+            name="help",
+            description="Show help for bot commands. Optionally provide a command name."
+        )
+        @app_commands.describe(command_name="Optional command name to show detailed help for")
+        async def _help_slash(interaction: discord.Interaction, command_name: str | None = None):
+            settings = load_guild_settings(interaction.guild.id) if interaction.guild else {"prefix": "S!", "color": "#1DB954"}
+            prefix = settings.get("prefix", "S!")
+            color = settings.get("color", "#1DB954")
+            color_int = int(color.lstrip("#"), 16) if isinstance(color, str) and color.startswith("#") else 0x1DB954
 
-                if command_name:
-                    cmd = bot.get_command(command_name)
-                    if not cmd:
-                        await interaction.response.send_message(f"Unknown command: `{command_name}`", ephemeral=True)
-                        return
+            # Populate missing command.help from docstring where possible
+            for c in bot.commands:
+                if not c.help:
+                    doc = getattr(getattr(c, 'callback', None), '__doc__', None)
+                    if doc:
+                        c.help = doc.strip().splitlines()[0]
 
-                    e = discord.Embed(title=f"Help: {cmd.name}", color=color_int)
-                    e.add_field(name="Signature", value=f"{prefix}{cmd.name} {cmd.signature}".strip(), inline=False)
-                    e.add_field(name="Description", value=_cmd_help_text(cmd), inline=False)
-                    if cmd.aliases:
-                        e.add_field(name="Aliases", value=', '.join(cmd.aliases), inline=False)
-                    await interaction.response.send_message(embed=e, ephemeral=True)
+            if command_name:
+                cmd = bot.get_command(command_name)
+                if not cmd:
+                    await interaction.response.send_message(f"Unknown command: `{command_name}`", ephemeral=True)
                     return
 
-                cmds = [c for c in bot.commands if not c.hidden]
-                grouped: dict[str, list[commands.Command]] = {}
-                for c in sorted(cmds, key=lambda x: (x.cog_name or '', x.name)):
-                    key = c.cog_name or 'General'
-                    grouped.setdefault(key, []).append(c)
-
-                e = discord.Embed(title="🎶 Sonus Help", color=color_int)
-                for cog, clist in grouped.items():
-                    lines = []
-                    for c in clist:
-                        sig = f" {c.signature}" if c.signature else ''
-                        name = f"{prefix}{c.name}{sig}"
-                        desc = _cmd_help_text(c)
-                        lines.append(f"**{name}** — {desc}")
-                    value = "\n".join(lines)
-                    if len(value) > 1000:
-                        value = value[:997] + '...'
-                    e.add_field(name=cog, value=value, inline=False)
-
+                e = discord.Embed(title=f"Help: {cmd.name}", color=color_int)
+                e.add_field(name="Signature", value=f"{prefix}{cmd.name} {cmd.signature}".strip(), inline=False)
+                e.add_field(name="Description", value=_cmd_help_text(cmd), inline=False)
+                if cmd.aliases:
+                    e.add_field(name="Aliases", value=', '.join(cmd.aliases), inline=False)
                 await interaction.response.send_message(embed=e, ephemeral=True)
-        else:
-            logger.info("Slash help command already exists; skipping registration")
+                return
+
+            cmds = [c for c in bot.commands if not c.hidden]
+            grouped: dict[str, list[commands.Command]] = {}
+            for c in sorted(cmds, key=lambda x: (x.cog_name or '', x.name)):
+                key = c.cog_name or 'General'
+                grouped.setdefault(key, []).append(c)
+
+            e = discord.Embed(title="🎶 Sonus Help", color=color_int)
+            for cog, clist in grouped.items():
+                lines = []
+                for c in clist:
+                    sig = f" {c.signature}" if c.signature else ''
+                    name = f"{prefix}{c.name}{sig}"
+                    desc = _cmd_help_text(c)
+                    lines.append(f"**{name}** — {desc}")
+                value = "\n".join(lines)
+                if len(value) > 1000:
+                    value = value[:997] + '...'
+                e.add_field(name=cog, value=value, inline=False)
+
+            await interaction.response.send_message(embed=e, ephemeral=True)
+    else:
+        logger.info("Slash help command already exists; skipping registration")
