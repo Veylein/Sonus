@@ -8,6 +8,7 @@ from discord.ext import commands
 from src.config import Config
 from src.logger import setup_logger
 from src.audio.player import Player
+from src.utils.guild_settings import load as load_guild_settings
 
 logger = setup_logger(__name__)
 
@@ -64,8 +65,20 @@ def create_bot():
     intents.guilds = True
     intents.voice_states = True
 
+    async def _get_prefix(bot, message):
+        # return a callable-compatible prefix list; fall back to default
+        try:
+            if message.guild:
+                settings = load_guild_settings(message.guild.id)
+                prefix = settings.get("prefix", "S!")
+            else:
+                prefix = "S!"
+            return commands.when_mentioned_or(prefix)(bot, message)
+        except Exception:
+            return commands.when_mentioned_or("S!")(bot, message)
+
     bot = commands.Bot(
-        command_prefix=commands.when_mentioned_or("S!"),
+        command_prefix=_get_prefix,
         intents=intents
     )
 
@@ -108,6 +121,14 @@ def create_bot():
                     pass
         except Exception:
             pass
+        # Ensure commands have a help string
+        try:
+            for c in bot.commands:
+                if not c.help:
+                    c.help = "No description provided."
+        except Exception:
+            pass
+
         # Sync slash commands globally
         try:
             await bot.tree.sync()
