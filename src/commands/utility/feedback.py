@@ -101,4 +101,9 @@ async def _handle_feedback(bot: commands.Bot, author: discord.abc.User, content:
 
 
 async def setup(bot: commands.Bot):
+    # Prevent duplicate cog registration if an identical Feedback cog
+    # (e.g. src.commands.feedback) is already loaded in the bot.
+    if bot.get_cog('Feedback') is not None:
+        logger.info('Feedback cog already loaded; skipping duplicate registration')
+        return
     await bot.add_cog(Feedback(bot))
