@@ -220,28 +220,31 @@ def register(bot: commands.Bot):
         await ctx.send(f"Album unpublished: {name}")
         await log_action(bot, ctx.author.id, "album_unpublish", {"name": name})
 
-    @bot.group(name="radio", invoke_without_command=True)
-    @owner_only()
-    async def _radio(ctx: commands.Context):
-        await ctx.send("Use: radio enable|disable <name>")
+    if bot.get_command('radio') is None:
+        @bot.group(name="radio", invoke_without_command=True)
+        @owner_only()
+        async def _radio(ctx: commands.Context):
+            await ctx.send("Use: radio enable|disable <name>")
 
-    @_radio.command(name="enable")
-    @owner_only()
-    async def _radio_enable(ctx: commands.Context, *, name: str):
-        s = getattr(bot, "sonus_enabled_radios", set())
-        s.add(name)
-        bot.sonus_enabled_radios = s
-        await ctx.send(f"Radio enabled: {name}")
-        await log_action(bot, ctx.author.id, "radio_enable", {"name": name})
+        @_radio.command(name="enable")
+        @owner_only()
+        async def _radio_enable(ctx: commands.Context, *, name: str):
+            s = getattr(bot, "sonus_enabled_radios", set())
+            s.add(name)
+            bot.sonus_enabled_radios = s
+            await ctx.send(f"Radio enabled: {name}")
+            await log_action(bot, ctx.author.id, "radio_enable", {"name": name})
 
-    @_radio.command(name="disable")
-    @owner_only()
-    async def _radio_disable(ctx: commands.Context, *, name: str):
-        s = getattr(bot, "sonus_enabled_radios", set())
-        s.discard(name)
-        bot.sonus_enabled_radios = s
-        await ctx.send(f"Radio disabled: {name}")
-        await log_action(bot, ctx.author.id, "radio_disable", {"name": name})
+        @_radio.command(name="disable")
+        @owner_only()
+        async def _radio_disable(ctx: commands.Context, *, name: str):
+            s = getattr(bot, "sonus_enabled_radios", set())
+            s.discard(name)
+            bot.sonus_enabled_radios = s
+            await ctx.send(f"Radio disabled: {name}")
+            await log_action(bot, ctx.author.id, "radio_disable", {"name": name})
+    else:
+        logger.info("Radio command already exists; skipping owner radio group")
 
     @bot.command(name="audiodebug")
     @owner_only()
