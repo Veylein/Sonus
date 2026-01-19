@@ -1,20 +1,26 @@
+from collections import deque
+from typing import Any
+
 from discord import Embed
 
 
 class TrackQueue:
     def __init__(self):
-        self._items = []
+        self._items = deque()
 
-    def add(self, item: dict):
+    def add(self, item: dict[str, Any]):
         self._items.append(item)
 
     def pop(self):
         if not self._items:
             return None
-        return self._items.pop(0)
+        return self._items.popleft()
 
     def all(self):
         return list(self._items)
+
+    def dequeue(self):
+        return self.pop()
 
 
 def register(bot):
