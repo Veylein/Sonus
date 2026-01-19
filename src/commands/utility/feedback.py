@@ -1,70 +1,95 @@
-import discord
-from discord import app_commands
-from discord.ext import commands
+import { Client, GatewayIntentBits, SlashCommandBuilder, Routes } from 'discord.js';
+import { REST } from '@discordjs/rest';
+import 'dotenv/config';
 
-from src.logger import setup_logger
-from src.utils.audit import log_action
+const client = new Client({
+    intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages, GatewayIntentBits.MessageContent, GatewayIntentBits.DirectMessages],
+    partials: ['CHANNEL'], // Needed to DM users
+});
 
-logger = setup_logger(__name__)
+const FEEDBACK_CHANNEL_ID = '1462019751218778112';
+const PREFIX = 'S!';
 
-FEEDBACK_CHANNEL = 1462019751218778112
+// Register slash command globally
+const commands = [
+    new SlashCommandBuilder()
+        .setName('feedback')
+        .setDescription('Send feedback to the devs')
+        .addStringOption(option =>
+            option.setName('text')
+                .setDescription('Your feedback')
+                .setRequired(true)
+        )
+].map(cmd => cmd.toJSON());
 
+const rest = new REST({ version: '10' }).setToken(process.env.SONUS_TOKEN);
 
-def register(bot: commands.Bot):
-    @bot.command(name="feedback")
-    async def _feedback(ctx: commands.Context, *, text: str):
-        """Prefix command: S!feedback <text>"""
-        success = await _handle_feedback(bot, author=ctx.author, content=text)
-        if success:
-            await ctx.send("✅ Thanks — your feedback was sent to the devs.")
-        else:
-            await ctx.send("❌ Sorry — I couldn't deliver your feedback. The devs have been notified.")
-        await log_action(bot, ctx.author.id, "feedback_prefix", {"text_preview": text[:200], "delivered": success})
+(async () => {
+    try {
+        console.log('Registering slash commands globally...');
+        await rest.put(
+            Routes.applicationCommands(process.env.CLIENT_ID),
+            { body: commands }
+        );
+        console.log('Slash commands registered.');
+    } catch (error) {
+        console.error(error);
+    }
+})();
 
-    @bot.tree.command(name="feedback")
-    @app_commands.describe(text="Your feedback for the Sonus devs")
-    async def _feedback_slash(interaction: discord.Interaction, text: str):
-        """Slash command: /feedback <text>"""
-        await interaction.response.defer(ephemeral=True)
-        success = await _handle_feedback(bot, author=interaction.user, content=text)
-        if success:
-            await interaction.followup.send("✅ Thanks — your feedback was sent to the devs.", ephemeral=True)
-        else:
-            await interaction.followup.send("❌ Sorry — I couldn't deliver your feedback. The devs have been notified.", ephemeral=True)
-        await log_action(bot, interaction.user.id, "feedback_slash", {"text_preview": text[:200], "delivered": success})
+client.on('ready', () => {
+    console.log(`Logged in as ${client.user.tag}`);
+});
 
+// Handle prefix commands
+client.on('messageCreate', async (message) => {
+    if (message.author.bot) return;
+    if (!message.content.startsWith(PREFIX)) return;
 
-async def _handle_feedback(bot: commands.Bot, author: discord.abc.User, content: str) -> bool:
-    # Build an embed for devs. Use description (larger limit) and clamp to safe size.
-    e = discord.Embed(title="User Feedback", color=0x1DB954)
-    e.add_field(name="From", value=f"{author} (ID: {author.id})", inline=False)
-    safe_content = (content or "(empty)")[:3900]
-    e.description = safe_content
-    try:
-        # Try get cached channel first
-        ch = bot.get_channel(FEEDBACK_CHANNEL)
-        if ch is None:
-            ch = await bot.fetch_channel(FEEDBACK_CHANNEL)
-        await ch.send(embed=e)
-        return True
-    except Exception:
-        logger.exception("Failed to deliver feedback to dev channel")
-        # fallback: attempt to DM the bot owner(s) if available (use fetch_user to ensure object)
-        delivered_any = False
-        try:
-            for owner_id in getattr(bot, "owner_ids", []) or []:
-                try:
-                    owner = await bot.fetch_user(owner_id)
-                    if owner:
-                        await owner.send(f"Feedback delivery failed for message from {author}:", embed=e)
-                        delivered_any = True
-                except Exception:
-                    logger.exception("Failed sending feedback DM to owner %s", owner_id)
-        except Exception:
-            logger.exception("Failed to deliver feedback to owners as fallback")
-        # If still failed, record an audit entry so devs can find the raw content later
-        try:
-            await log_action(bot, author.id, "feedback_failed_delivery", {"text_preview": (content or "")[:200], "delivered_to_owner": delivered_any})
-        except Exception:
-            logger.exception("Failed to write feedback failure audit entry")
-        return delivered_any
+    const args = message.content.slice(PREFIX.length).trim().split(/ +/);
+    const command = args.shift().toLowerCase();
+
+    if (command === 'feedback') {
+        const feedback = args.join(' ');
+        if (!feedback) return message.reply('Please provide feedback text.');
+
+        const channel = await client.channels.fetch(FEEDBACK_CHANNEL_ID).catch(() => null);
+        if (!channel?.isTextBased()) return message.reply('Feedback channel not found.');
+
+        try {
+            await channel.send(`[${message.author.tag}] ID:${message.author.id} says \`${feedback}\``);
+            await message.author.send('Your feedback was sent');
+        } catch (err) {
+            console.error(err);
+            await message.author.send('Feedback could not be sent, the devs have been notified');
+            if (channel) await channel.send(`[${message.author.tag}] could not send feedback`);
+        }
+    }
+});
+
+// Handle slash commands
+client.on('interactionCreate', async (interaction) => {
+    if (!interaction.isChatInputCommand()) return;
+
+    if (interaction.commandName === 'feedback') {
+        const feedback = interaction.options.getString('text');
+        const channel = await client.channels.fetch(FEEDBACK_CHANNEL_ID).catch(() => null);
+
+        if (!channel?.isTextBased()) {
+            return interaction.reply({ content: 'Feedback channel not found.', ephemeral: true });
+        }
+
+        try {
+            await channel.send(`[${interaction.user.tag}] ID:${interaction.user.id} says \`${feedback}\``);
+            await interaction.user.send('Your feedback was sent');
+            await interaction.reply({ content: 'Feedback sent successfully!', ephemeral: true });
+        } catch (err) {
+            console.error(err);
+            await interaction.user.send('Feedback could not be sent, the devs have been notified');
+            if (channel) await channel.send(`[${interaction.user.tag}] could not send feedback`);
+            await interaction.reply({ content: 'There was an error sending your feedback.', ephemeral: true });
+        }
+    }
+});
+
+client.login(process.env.SONUS_TOKEN);
