@@ -4,6 +4,7 @@ from typing import Optional, Dict, Any, List
 import discord
 from discord import app_commands
 from discord.ext import commands
+import os
 import yt_dlp
 
 from src.logger import setup_logger
@@ -12,12 +13,16 @@ from src.utils.audit import log_action
 logger = setup_logger(__name__)
 
 
+_YTDL_COOKIEFILE = os.getenv('YTDL_COOKIEFILE') or os.getenv('YTDL_COOKIES')
+
 YTDL_OPTS = {
     'format': 'bestaudio/best',
     'quiet': True,
     'nocheckcertificate': True,
     'no_warnings': True,
 }
+if _YTDL_COOKIEFILE:
+    YTDL_OPTS['cookiefile'] = _YTDL_COOKIEFILE
 
 
 def _select_audio_url(info: Dict[str, Any]) -> Optional[str]:

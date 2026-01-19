@@ -2,8 +2,11 @@ from discord.ext import commands
 from discord import app_commands
 from src.utils.playlist_store import add_track, get_playlist
 from src.utils.audit import log_action
+import os
 import yt_dlp
 
+
+_YTDL_COOKIEFILE = os.getenv('YTDL_COOKIEFILE') or os.getenv('YTDL_COOKIES')
 
 YTDL_OPTS = {
     'format': 'bestaudio/best',
@@ -11,6 +14,8 @@ YTDL_OPTS = {
     'nocheckcertificate': True,
     'no_warnings': True,
 }
+if _YTDL_COOKIEFILE:
+    YTDL_OPTS['cookiefile'] = _YTDL_COOKIEFILE
 
 
 def _extract_title_and_url(query: str):
