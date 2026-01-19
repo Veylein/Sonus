@@ -1,4 +1,27 @@
+from collections import deque
+from typing import Any
+
 from discord import Embed
+
+
+class TrackQueue:
+    def __init__(self):
+        self._items = deque()
+
+    def enqueue(self, item: dict[str, Any]) -> None:
+        self._items.append(item)
+
+    add = enqueue
+
+    def dequeue(self) -> dict[str, Any] | None:
+        if not self._items:
+            return None
+        return self._items.popleft()
+
+    pop = dequeue
+
+    def all(self) -> list[dict[str, Any]]:
+        return list(self._items)
 
 
 def register(bot):
@@ -6,8 +29,11 @@ def register(bot):
     async def _queue(ctx):
         try:
             items = bot.player.all()
-        except Exception:
-            items = getattr(bot, "sonus_queue", [])
+        except (AttributeError, TypeError):
+            try:
+                items = bot.track_queue.all()
+            except (AttributeError, TypeError):
+                items = getattr(bot, "sonus_queue", [])
 
         if not items:
             await ctx.send("Queue is empty")
