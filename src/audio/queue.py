@@ -31,10 +31,10 @@ def register(bot):
     async def _queue(ctx):
         try:
             items = bot.player.all()
-        except Exception:
+        except (AttributeError, TypeError):
             try:
                 items = bot.track_queue.all()
-            except Exception:
+            except (AttributeError, TypeError):
                 items = getattr(bot, "sonus_queue", [])
 
         if not items:
