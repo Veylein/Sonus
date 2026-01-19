@@ -10,9 +10,16 @@ def register(bot: commands.Bot):
     async def _settings(ctx: commands.Context):
         if ctx.invoked_subcommand is None:
             data = load(ctx.guild.id) if ctx.guild else {"prefix": "S!", "color": "#1DB954"}
-            e = discord.Embed(title='Server Settings', color=int(data.get('color', '#1DB954').lstrip('#'), 16))
+            color = data.get('color', '#1DB954')
+            e = discord.Embed(title='Server Settings', color=int(color.lstrip('#'), 16), timestamp=discord.utils.utcnow())
+            try:
+                e.set_author(name=str(ctx.guild.name), icon_url=ctx.guild.icon.url if ctx.guild and ctx.guild.icon else None)
+            except Exception:
+                pass
             e.add_field(name='Prefix', value=data.get('prefix', 'S!'), inline=True)
             e.add_field(name='Color', value=data.get('color', '#1DB954'), inline=True)
+            e.add_field(name='Examples', value=f"Set prefix: `{data.get('prefix','S!')}settings prefix !`\nSet color: `{data.get('prefix','S!')}settings color #1DB954`", inline=False)
+            e.set_footer(text='Only users with Manage Server can change these settings')
             await ctx.send(embed=e)
 
     @_settings.command(name='prefix')
@@ -27,10 +34,11 @@ def register(bot: commands.Bot):
         old = data_before.get('prefix', 'S!')
         set_prefix(ctx.guild.id, prefix)
         color = data_before.get('color', '#1DB954')
-        e = discord.Embed(title='Server Settings Updated', color=int(color.lstrip('#'), 16))
+        e = discord.Embed(title='Server Settings Updated', color=int(color.lstrip('#'), 16), timestamp=discord.utils.utcnow())
         e.add_field(name='Setting', value='Prefix', inline=True)
         e.add_field(name='Old', value=old, inline=True)
         e.add_field(name='New', value=prefix, inline=True)
+        e.set_footer(text=f'Example: {old}help')
         await ctx.send(embed=e)
 
     @_settings.command(name='color')
@@ -74,6 +82,9 @@ def register(bot: commands.Bot):
             return
         if color.startswith('#') and len(color) in (4, 7):
             set_color(interaction.guild.id, color)
-            await interaction.followup.send(f'Color set to: {color}', ephemeral=True)
+            e = discord.Embed(title='Server Settings Updated', color=int(color.lstrip('#'), 16), timestamp=discord.utils.utcnow())
+            e.add_field(name='Setting', value='Color', inline=True)
+            e.add_field(name='New', value=color, inline=True)
+            await interaction.followup.send(embed=e, ephemeral=True)
             return
         await interaction.followup.send('Provide a color in hex form, e.g. #1DB954', ephemeral=True)

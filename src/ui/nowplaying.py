@@ -10,11 +10,40 @@ VIEW_TIMEOUT = None
 def _build_embed(track: Optional[dict]) -> Embed:
     if not track:
         return Embed(title="Now Playing", description="Nothing is playing.")
+
     title = track.get('title', 'Unknown')
     url = track.get('webpage_url') or track.get('url')
-    e = Embed(title="Now Playing", description=f"**{title}**")
+    thumb = track.get('thumbnail') or (track.get('thumbnails') and (track.get('thumbnails')[-1].get('url') if isinstance(track.get('thumbnails')[-1], dict) else None))
+
+    e = Embed(title=title, description=f"Now playing — **{title}**", color=0x1DB954)
+    if thumb:
+        try:
+            e.set_thumbnail(url=thumb)
+        except Exception:
+            pass
+
     if url:
-        e.add_field(name="Source", value=f"[link]({url})")
+        e.add_field(name="Source", value=f"[Open]({url})", inline=True)
+
+    # extra metadata if present
+    duration = track.get('duration')
+    requester = track.get('requester') or track.get('requested_by') or track.get('user')
+    if duration:
+        # format duration mm:ss or hh:mm:ss
+        def _fmt(s: int) -> str:
+            h = s // 3600
+            m = (s % 3600) // 60
+            sec = s % 60
+            if h:
+                return f"{h:d}:{m:02d}:{sec:02d}"
+            return f"{m:d}:{sec:02d}"
+
+        e.add_field(name="Duration", value=_fmt(int(duration)), inline=True)
+    if requester:
+        e.add_field(name="Requested by", value=str(requester), inline=True)
+
+    # small footer placeholder; actual state updated when editing
+    e.set_footer(text="Status: playing")
     return e
 
 
@@ -35,16 +64,16 @@ class NowPlayingView(discord.ui.View):
         try:
             if vc and vc.is_playing():
                 vc.pause()
-                await interaction.followup.send('Paused', ephemeral=True)
+                await interaction.followup.send('⏸️ Paused', ephemeral=True)
             elif vc and vc.is_paused():
                 vc.resume()
-                await interaction.followup.send('Resumed', ephemeral=True)
+                await interaction.followup.send('▶️ Resumed', ephemeral=True)
             else:
                 # try to start playback if queue exists
                 player = getattr(self.bot, 'player', None)
                 if player and hasattr(player, 'resume'):
                     player.resume()
-                    await interaction.followup.send('Resumed player', ephemeral=True)
+                    await interaction.followup.send('▶️ Resumed player', ephemeral=True)
                 else:
                     await interaction.followup.send('No active playback to toggle.', ephemeral=True)
         except Exception as exc:
@@ -58,12 +87,12 @@ class NowPlayingView(discord.ui.View):
             vc = ctx.guild.voice_client
             if vc and vc.is_playing():
                 vc.stop()
-                await interaction.followup.send('Skipped track', ephemeral=True)
+                await interaction.followup.send('⏭️ Skipped track', ephemeral=True)
             else:
                 player = getattr(self.bot, 'player', None)
                 if player and hasattr(player, 'skip'):
                     player.skip()
-                    await interaction.followup.send('Skipped (player)', ephemeral=True)
+                    await interaction.followup.send('⏭️ Skipped (player)', ephemeral=True)
                 else:
                     await interaction.followup.send('Nothing to skip.', ephemeral=True)
         except Exception as exc:
@@ -140,7 +169,13 @@ def register(bot: commands.Bot):
         meta = getattr(bot, 'sonus_now_message_meta', {})
         meta[ctx.guild.id] = {'channel_id': ctx.channel.id, 'message_id': msg.id}
         bot.sonus_now_message_meta = meta
-        await ctx.send('Now-playing message posted (persistent).', ephemeral=True)
+        try:
+            await ctx.send(embed=discord.Embed(description='Now-playing message posted (persistent).', color=0x1DB954))
+        except Exception:
+            try:
+                await ctx.send('Now-playing message posted (persistent).')
+            except Exception:
+                pass
 
     @bot.tree.command(name='nowplaying')
     async def _nowplaying_slash(interaction: discord.Interaction):

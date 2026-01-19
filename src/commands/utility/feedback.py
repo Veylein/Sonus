@@ -19,16 +19,30 @@ class Feedback(commands.Cog):
         """Prefix command: S!feedback <text>"""
         success = await _handle_feedback(self.bot, author=ctx.author, content=text)
         if success:
+            e = discord.Embed(title="Feedback Received", description="Thanks — your feedback was sent to the devs.", color=0x1DB954)
             try:
-                await ctx.send("✅ Thanks — your feedback was sent to the devs.")
+                await ctx.send(embed=e)
             except Exception:
-                pass
+                try:
+                    await ctx.send("✅ Thanks — your feedback was sent to the devs.")
+                except Exception:
+                    pass
             try:
-                await ctx.author.send("✅ Thanks — your feedback was sent to the devs.")
+                await ctx.author.send(embed=e)
             except Exception:
-                pass
+                try:
+                    await ctx.author.send("✅ Thanks — your feedback was sent to the devs.")
+                except Exception:
+                    pass
         else:
-            await ctx.send("❌ Sorry — I couldn't deliver your feedback. The devs have been notified.")
+            e = discord.Embed(title="Feedback Delivery Failed", description="Sorry — I couldn't deliver your feedback. The devs have been notified.", color=0xE74C3C)
+            try:
+                await ctx.send(embed=e)
+            except Exception:
+                try:
+                    await ctx.send("❌ Sorry — I couldn't deliver your feedback. The devs have been notified.")
+                except Exception:
+                    pass
         await log_action(self.bot, ctx.author.id, "feedback_prefix", {"text_preview": text[:200], "delivered": success})
 
     @app_commands.command(name="feedback", description="Send feedback to the devs")
@@ -38,16 +52,30 @@ class Feedback(commands.Cog):
         await interaction.response.defer(ephemeral=True)
         success = await _handle_feedback(self.bot, author=interaction.user, content=text)
         if success:
+            e = discord.Embed(title="Feedback Received", description="Thanks — your feedback was sent to the devs.", color=0x1DB954)
             try:
-                await interaction.followup.send("✅ Thanks — your feedback was sent to the devs.", ephemeral=True)
+                await interaction.followup.send(embed=e, ephemeral=True)
             except Exception:
-                pass
+                try:
+                    await interaction.followup.send("✅ Thanks — your feedback was sent to the devs.", ephemeral=True)
+                except Exception:
+                    pass
             try:
-                await interaction.user.send("✅ Thanks — your feedback was sent to the devs.")
+                await interaction.user.send(embed=e)
             except Exception:
-                pass
+                try:
+                    await interaction.user.send("✅ Thanks — your feedback was sent to the devs.")
+                except Exception:
+                    pass
         else:
-            await interaction.followup.send("❌ Sorry — I couldn't deliver your feedback. The devs have been notified.", ephemeral=True)
+            e = discord.Embed(title="Feedback Delivery Failed", description="Sorry — I couldn't deliver your feedback. The devs have been notified.", color=0xE74C3C)
+            try:
+                await interaction.followup.send(embed=e, ephemeral=True)
+            except Exception:
+                try:
+                    await interaction.followup.send("❌ Sorry — I couldn't deliver your feedback. The devs have been notified.", ephemeral=True)
+                except Exception:
+                    pass
         await log_action(self.bot, interaction.user.id, "feedback_slash", {"text_preview": text[:200], "delivered": success})
 
 
