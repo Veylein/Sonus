@@ -22,8 +22,16 @@ def register(bot: commands.Bot):
         if not perms.manage_guild:
             await ctx.send('You need the Manage Server permission to change settings.')
             return
+        # show previous value in embed and confirm change
+        data_before = load(ctx.guild.id) if ctx.guild else {"prefix": "S!", "color": "#1DB954"}
+        old = data_before.get('prefix', 'S!')
         set_prefix(ctx.guild.id, prefix)
-        await ctx.send(f'Prefix set to: {prefix}')
+        color = data_before.get('color', '#1DB954')
+        e = discord.Embed(title='Server Settings Updated', color=int(color.lstrip('#'), 16))
+        e.add_field(name='Setting', value='Prefix', inline=True)
+        e.add_field(name='Old', value=old, inline=True)
+        e.add_field(name='New', value=prefix, inline=True)
+        await ctx.send(embed=e)
 
     @_settings.command(name='color')
     async def _set_color(ctx: commands.Context, color: str):
@@ -46,8 +54,15 @@ def register(bot: commands.Bot):
         if not perms.manage_guild:
             await interaction.followup.send('You need the Manage Server permission to change settings.', ephemeral=True)
             return
+        data_before = load(interaction.guild.id) if interaction.guild else {"prefix": "S!", "color": "#1DB954"}
+        old = data_before.get('prefix', 'S!')
         set_prefix(interaction.guild.id, prefix)
-        await interaction.followup.send(f'Prefix set to: {prefix}', ephemeral=True)
+        color = data_before.get('color', '#1DB954')
+        e = discord.Embed(title='Server Settings Updated', color=int(color.lstrip('#'), 16))
+        e.add_field(name='Setting', value='Prefix', inline=True)
+        e.add_field(name='Old', value=old, inline=True)
+        e.add_field(name='New', value=prefix, inline=True)
+        await interaction.followup.send(embed=e, ephemeral=True)
 
     @bot.tree.command(name='settings-color')
     @app_commands.describe(color='Hex color, e.g. #1DB954')
