@@ -26,8 +26,10 @@ def _load_radios() -> Dict[str, Dict]:
                 data = load_json(f"data/radios/{p.name}")
                 if data.get("id"):
                     radios[data["id"].lower()] = data
-            except Exception:
-                continue
+            except FileNotFoundError:
+                logger.debug("Radio file missing: %s", p)
+            except Exception as exc:
+                logger.debug("Failed to load radio file %s: %s", p, exc)
     _RADIO_CACHE = radios
     return radios
 
@@ -109,7 +111,7 @@ def register(bot):
                 "title": radio.get("name") or radio.get("id"),
                 "source": radio.get("source"),
                 "type": "radio",
-                "started_at": asyncio.get_event_loop().time(),
+                "started_at": asyncio.get_running_loop().time(),
             }
             try:
                 setattr(bot, "sonus_now_playing", track)
