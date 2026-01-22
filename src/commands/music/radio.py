@@ -1,4 +1,5 @@
 import asyncio
+import logging
 from pathlib import Path
 from typing import Dict, Optional
 
@@ -11,6 +12,7 @@ from src.commands.music.play import _ensure_vc_connected, _create_player_with_pr
 
 RADIOS_PATH = ROOT / "data" / "radios"
 _RADIO_CACHE: Dict[str, Dict] = {}
+logger = logging.getLogger(__name__)
 
 
 def _load_radios() -> Dict[str, Dict]:
@@ -75,8 +77,10 @@ def register(bot):
 
         preferred = None
         try:
-            if ctx.author and getattr(ctx.author, "voice", None) and getattr(ctx.author.voice, "channel", None):
-                preferred = ctx.author.voice.channel.id
+            voice_state = getattr(ctx.author, "voice", None)
+            channel = getattr(voice_state, "channel", None)
+            if channel:
+                preferred = channel.id
         except Exception:
             preferred = None
 
@@ -92,7 +96,7 @@ def register(bot):
             if vc.is_playing() or vc.is_paused():
                 vc.stop()
         except Exception:
-            pass
+            logger.debug("Failed to stop existing playback before starting radio", exc_info=True)
 
         ffmpeg_options = {
             "before_options": "-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5",
